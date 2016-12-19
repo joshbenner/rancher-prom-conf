@@ -3,7 +3,7 @@ FROM python:3.5-slim
 COPY requirements.txt rancher-prom-conf.py /
 
 RUN pip install -r /requirements.txt && \
-    chmod +x /prom-rancher-conf.py && \
+    chmod +x /rancher-prom-conf.py && \
     mkdir -p /etc/prometheus
 
 ENTRYPOINT ["/rancher-prom-conf.py"]
