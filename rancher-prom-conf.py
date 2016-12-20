@@ -68,7 +68,7 @@ def write(config_dir, print, cattle_url, cattle_access_key, cattle_secret_key):
     hosts = []
     for host in client.list('host'):
         for instance in host.instances():
-            if 'node-exporter' in instance.name and instance.state == 'running'ss:
+            if 'node-exporter' in instance.name and instance.state == 'running':
                 click.echo("Discovered exporter on {}".format(host.hostname))
                 ip = (instance.data.fields.dockerIp or
                       instance.data.fields.dockerHostIp)
