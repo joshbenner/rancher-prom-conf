@@ -41,10 +41,6 @@ config = {
         {
             'job_name': 'Prometheus',
             'static_configs': [{'targets': ['127.0.0.1:9090']}]
-        },
-        {
-            'job_name': 'HostMetrics',
-            'file_sd_configs': [{'files': ['hosts.yml']}]
         }
     ]
 }
@@ -77,6 +73,11 @@ def write(config_dir, print, cattle_url, cattle_access_key, cattle_secret_key):
                 })
                 break
 
+    # noinspection PyTypeChecker
+    config['scrape_configs'].append({
+        'job_name': 'HostMetrics',
+        'file_sd_configs': [{'files': [os.path.join(config_dir, 'hosts.yml')]}]
+    })
     config_yml = yaml.dump(config, default_flow_style=False)
     hosts_yml = yaml.dump(hosts, default_flow_style=False)
     if print:
