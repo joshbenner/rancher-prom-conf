@@ -41,14 +41,18 @@ config = {
         {
             'job_name': 'Prometheus',
             'static_configs': [{'targets': ['127.0.0.1:9090']}]
+        },
+        {
+            'job_name': 'HostMetrics',
+            'file_sd_configs': [{'files': ['hosts.yml']}]
         }
     ]
 }
 
 
 @click.command()
-@click.option('--file', '-f', default='/etc/prometheus/config.yml',
-              help='File to write configuration to')
+@click.option('--config-dir', default='/etc/prometheus',
+              help='Directory to write configuration')
 @click.option('--print', '-p', default=False, is_flag=True,
               help='Prints YAML config to stdout instead of writing to file')
 @click.option('--cattle-url', '-u',
@@ -57,26 +61,38 @@ config = {
               default=lambda: os.environ.get('CATTLE_ACCESS_KEY'))
 @click.option('--cattle-secret-key', '-s',
               default=lambda: os.environ.get('CATTLE_SECRET_KEY'))
-def write(file, print, cattle_url, cattle_access_key, cattle_secret_key):
+def write(config_dir, print, cattle_url, cattle_access_key, cattle_secret_key):
     client = cattle.Client(url=cattle_url,
                            access_key=cattle_access_key,
                            secret_key=cattle_secret_key)
-    targets = []
+    hosts = []
     for host in client.list('host'):
-        click.echo('Discovered {}'.format(host.hostname))
-        targets.append('{}:{}'.format(host.hostname, 9100))
-    # noinspection PyTypeChecker
-    config['scrape_configs'].append({
-        'job_name': 'HostMetrics',
-        'static_configs': [{'targets': targets}]
-    })
-    yml = yaml.dump(config, default_flow_style=False)
+        for instance in host.instances():
+            if 'node-exporter' in instance.name and instance.state == 'running'ss:
+                click.echo("Discovered exporter on {}".format(host.hostname))
+                ip = (instance.data.fields.dockerIp or
+                      instance.data.fields.dockerHostIp)
+                hosts.append({
+                    'targets': ['{}:{}'.format(ip, 9100)],
+                    'labels': {'instance': host.hostname}
+                })
+                break
+
+    config_yml = yaml.dump(config, default_flow_style=False)
+    hosts_yml = yaml.dump(hosts, default_flow_style=False)
     if print:
-        click.echo(yml)
+        click.echo('# config.yml')
+        click.echo('---')
+        click.echo(config_yml)
+        click.echo('# hosts.yml')
+        click.echo('---')
+        click.echo(hosts_yml)
     else:
-        with open(file, mode='w') as f:
-            f.writelines(yml)
-        click.echo('Config written to {}'.format(file))
+        with open(os.path.join(config_dir, 'hosts.yml'), mode='w') as f:
+            f.writelines(hosts_yml)
+        with open(os.path.join(config_dir, 'config.yml'), mode='w') as f:
+            f.writelines(config_yml)
+        click.echo('Config written to {}'.format(config_dir))
 
 
 if __name__ == '__main__':
