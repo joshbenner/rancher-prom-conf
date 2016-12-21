@@ -43,20 +43,21 @@ def write(config_dir, print, cattle_url, cattle_access_key, cattle_secret_key):
     cadvisors = []
     rancher = []
     for host in client.list('host'):
+        host_ip = host.data.fields.agentIpAddress
         for instance in host.instances():
             if instance.state != 'running':
                 continue
             if 'node-exporter' in instance.name:
                 click.echo("Discovered node exporter on {}"
                            .format(host.hostname))
-                hostname = (instance.primaryIpAddress or host.hostname)
+                hostname = (instance.primaryIpAddress or host_ip)
                 hosts.append({
                     'targets': ['{}:{}'.format(hostname, 9100)],
                     'labels': {'instance': host.hostname}
                 })
             elif 'cadvisor' in instance.name:
                 click.echo('Discovered cadvisor on {}'.format(host.hostname))
-                hostname = (instance.primaryIpAddress or host.hostname)
+                hostname = (instance.primaryIpAddress or host_ip)
                 cadvisors.append({
                     'targets': ['{}:{}'.format(hostname, 8080)],
                     'labels': {'instance': host.hostname}
@@ -64,7 +65,7 @@ def write(config_dir, print, cattle_url, cattle_access_key, cattle_secret_key):
             elif 'rancher-exporter' in instance.name:
                 click.echo('Discovered rancher exporter on {}'
                            .format(host.hostname))
-                hostname = (instance.primaryIpAddress or host.hostname)
+                hostname = (instance.primaryIpAddress or host_ip)
                 rancher.append({
                     'targets': ['{}:{}'.format(hostname, 9010)],
                     'labels': {'instance': host.hostname}
