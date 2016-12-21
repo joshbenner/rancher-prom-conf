@@ -59,7 +59,7 @@ def write(config_dir, print, cattle_url, cattle_access_key, cattle_secret_key):
                 click.echo('Discovered cadvisor on {}'.format(host.hostname))
                 hostname = (instance.primaryIpAddress or host_ip)
                 cadvisors.append({
-                    'targets': ['{}:{}'.format(hostname, 8080)],
+                    'targets': ['{}:{}'.format(hostname, 9001)],
                     'labels': {'instance': host.hostname}
                 })
             elif 'rancher-exporter' in instance.name:
