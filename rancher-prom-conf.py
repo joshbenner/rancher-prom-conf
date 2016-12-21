@@ -17,28 +17,6 @@ config = {
     },
     'scrape_configs': [
         {
-            'job_name': 'ContainerMetrics',
-            'dns_sd_configs': [
-                {
-                    'names': ['cadvisor'],
-                    'refresh_interval': '15s',
-                    'type': 'A',
-                    'port': 8080
-                }
-            ]
-        },
-        {
-            'job_name': 'rancher-api',
-            'dns_sd_configs': [
-                {
-                    'names': ['prometheus-rancher-exporter'],
-                    'refresh_interval': '15s',
-                    'type': 'A',
-                    'port': 9010
-                }
-            ]
-        },
-        {
             'job_name': 'Prometheus',
             'static_configs': [{'targets': ['127.0.0.1:9090']}]
         }
@@ -62,36 +40,73 @@ def write(config_dir, print, cattle_url, cattle_access_key, cattle_secret_key):
                            access_key=cattle_access_key,
                            secret_key=cattle_secret_key)
     hosts = []
+    cadvisors = []
+    rancher = []
     for host in client.list('host'):
         for instance in host.instances():
-            if 'node-exporter' in instance.name and instance.state == 'running':
-                click.echo("Discovered exporter on {}".format(host.hostname))
+            if instance.state != 'running':
+                continue
+            if 'node-exporter' in instance.name:
+                click.echo("Discovered node exporter on {}"
+                           .format(host.hostname))
                 hostname = (instance.primaryIpAddress or host.hostname)
                 hosts.append({
                     'targets': ['{}:{}'.format(hostname, 9100)],
                     'labels': {'instance': host.hostname}
                 })
-                break
+            elif 'cadvisor' in instance.name:
+                click.echo('Discovered cadvisor on {}'.format(host.hostname))
+                hostname = (instance.primaryIpAddress or host.hostname)
+                cadvisors.append({
+                    'targets': ['{}:{}'.format(hostname, 8080)],
+                    'labels': {'instance': host.hostname}
+                })
+            elif 'rancher-exporter' in instance.name:
+                click.echo('Discovered rancher exporter on {}'
+                           .format(host.hostname))
+                hostname = (instance.primaryIpAddress or host.hostname)
+                rancher.append({
+                    'targets': ['{}:{}'.format(hostname, 9010)],
+                    'labels': {'instance': host.hostname}
+                })
 
     # noinspection PyTypeChecker
-    config['scrape_configs'].append({
-        'job_name': 'HostMetrics',
-        'file_sd_configs': [{'files': [os.path.join(config_dir, 'hosts.yml')]}]
-    })
-    config_yml = yaml.dump(config, default_flow_style=False)
-    hosts_yml = yaml.dump(hosts, default_flow_style=False)
+    config['scrape_configs'].extend([
+        {
+            'job_name': 'HostMetrics',
+            'file_sd_configs': [
+                {'files': [os.path.join(config_dir, 'hosts.yml')]}
+            ]
+        },
+        {
+            'job_name': 'rancher-api',
+            'file_sd_configs': [
+                {'files': [os.path.join(config_dir, 'rancher.yml')]}
+            ]
+        },
+        {
+            'job_name': 'ContainerMetrics',
+            'file_sd_configs': [
+                {'files': [os.path.join(config_dir, 'cadvisors.yml')]}
+            ]
+        }
+    ])
+    files = (
+        ('config.yml', yaml.dump(config, default_flow_style=False)),
+        ('hosts.yml', yaml.dump(hosts)),
+        ('rancher.yml', yaml.dump(rancher)),
+        ('cadvisors.yml', yaml.dump(cadvisors))
+    )
     if print:
-        click.echo('# config.yml')
-        click.echo('---')
-        click.echo(config_yml)
-        click.echo('# hosts.yml')
-        click.echo('---')
-        click.echo(hosts_yml)
+        for filename, yml in files:
+            click.echo('# {}'.format(filename))
+            click.echo('---')
+            click.echo(yml)
     else:
-        with open(os.path.join(config_dir, 'hosts.yml'), mode='w') as f:
-            f.writelines(hosts_yml)
-        with open(os.path.join(config_dir, 'config.yml'), mode='w') as f:
-            f.writelines(config_yml)
+        for filename, yml in files:
+            with open(os.path.join(config_dir, filename), mode='w') as f:
+                f.writelines(yml)
+            click.echo('... wrote {}'.format(filename))
         click.echo('Config written to {}'.format(config_dir))
 
 
