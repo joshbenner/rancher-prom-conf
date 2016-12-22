@@ -82,7 +82,10 @@ def write(config_dir, print, cattle_url, cattle_access_key, cattle_secret_key):
                 hostname = (instance.primaryIpAddress or host_ip)
                 rancher.append({
                     'targets': ['{}:{}'.format(hostname, 9173)],
-                    'labels': {'instance': host.hostname}
+                    'labels': {
+                        'instance': host.hostname,
+                        'rancher_env': env_name(client, instance.accountId)
+                    }
                 })
 
     # noinspection PyTypeChecker
