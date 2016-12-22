@@ -23,6 +23,14 @@ config = {
     ]
 }
 
+env_names = {}
+
+
+def env_name(client, env_id):
+    if env_id not in env_names:
+        env_names[env_id] = client.by_id('account', env_id).name
+    return env_names[env_id]
+
 
 @click.command()
 @click.option('--config-dir', default='/etc/prometheus',
@@ -53,14 +61,20 @@ def write(config_dir, print, cattle_url, cattle_access_key, cattle_secret_key):
                 hostname = (instance.primaryIpAddress or host_ip)
                 hosts.append({
                     'targets': ['{}:{}'.format(hostname, 9100)],
-                    'labels': {'instance': host.hostname}
+                    'labels': {
+                        'instance': host.hostname,
+                        'rancher_env': env_name(client, instance.accountId)
+                    }
                 })
             elif 'cadvisor' in instance.name:
                 click.echo('Discovered cadvisor on {}'.format(host.hostname))
                 hostname = (instance.primaryIpAddress or host_ip)
                 cadvisors.append({
                     'targets': ['{}:{}'.format(hostname, 9001)],
-                    'labels': {'instance': host.hostname}
+                    'labels': {
+                        'instance': host.hostname,
+                        'rancher_env': env_name(client, instance.accountId)
+                    }
                 })
             elif 'rancher-exporter' in instance.name:
                 click.echo('Discovered rancher exporter on {}'
